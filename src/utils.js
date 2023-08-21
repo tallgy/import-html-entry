@@ -57,6 +57,12 @@ export function getGlobalProp(global) {
 		return lastProp;
 }
 
+/**
+ * 或者Object.keys(global).pop()，但这可能更快(等待基准测试)
+ * 会存储 firstGlobalProp secondGlobalProp lastGlobalProp 
+ * @param {*} global 
+ * @returns 返回 global 的最后一个属性
+ */
 export function noteGlobalProps(global) {
 	// alternatively Object.keys(global).pop()
 	// but this may be faster (pending benchmarks)
@@ -75,6 +81,11 @@ export function noteGlobalProps(global) {
 	return lastGlobalProp;
 }
 
+/**
+ * 获取 \<style|script>xxxx\</style|script> 中的 xxxx
+ * @param {*} match 
+ * @returns 
+ */
 export function getInlineCode(match) {
 	const start = match.indexOf('>') + 1;
 	const end = match.lastIndexOf('<');
@@ -118,6 +129,12 @@ export const requestIdleCallback =
 		}, 1);
 	};
 
+/**
+ * 读取响应的文字
+ * @param {*} response 
+ * @param {*} autoDetectCharset 
+ * @returns 
+ */
 export function readResAsString(response, autoDetectCharset) {
 	// 未启用自动检测
 	if (!autoDetectCharset) {
@@ -168,6 +185,12 @@ export function readResAsString(response, autoDetectCharset) {
 
 const evalCache = {};
 
+/**
+ * 使用 eval 方法创建 一个function，并存储在 evalCache 中
+ * 然后使用 call 方法执行
+ * @param {*} scriptSrc key
+ * @param {*} code 代码
+ */
 export function evalCode(scriptSrc, code) {
 	const key = scriptSrc;
 	if (!evalCache[key]) {

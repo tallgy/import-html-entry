@@ -5,25 +5,45 @@
  */
 import { getInlineCode, isModuleScriptSupported, parseUrl } from './utils';
 
+/** /(<script[\s\S]*?>)[\s\S]*?<\/script>/gi */
 const ALL_SCRIPT_REGEX = /(<script[\s\S]*?>)[\s\S]*?<\/script>/gi;
+/** /<(script)\s+((?!type=('|")text\/ng-template\3).)*?>.*?<\/\1>/is */
 const SCRIPT_TAG_REGEX = /<(script)\s+((?!type=('|")text\/ng-template\3).)*?>.*?<\/\1>/is;
+/** /.*\ssrc=('|")?([^>'"\s]+)/ */
 const SCRIPT_SRC_REGEX = /.*\ssrc=('|")?([^>'"\s]+)/;
+/** /.*\stype=('|")?([^>'"\s]+)/ */
 const SCRIPT_TYPE_REGEX = /.*\stype=('|")?([^>'"\s]+)/;
+/** /.*\sentry\s*.*\/ */
 const SCRIPT_ENTRY_REGEX = /.*\sentry\s*.*/;
+/** /.*\sasync\s*.*\/ */
 const SCRIPT_ASYNC_REGEX = /.*\sasync\s*.*/;
+/** /.*\scrossorigin=('|")?use-credentials\1/ */
 const SCRIPT_CROSSORIGIN_REGEX = /.*\scrossorigin=('|")?use-credentials\1/;
+/** /.*\snomodule\s*.*\/ */
 const SCRIPT_NO_MODULE_REGEX = /.*\snomodule\s*.*/;
+/** /.*\stype=('|")?module('|")?\s*.*\/ */
 const SCRIPT_MODULE_REGEX = /.*\stype=('|")?module('|")?\s*.*/;
+/** /<(link)\s+.*?>/isg */
 const LINK_TAG_REGEX = /<(link)\s+.*?>/isg;
+/** /\srel=('|")?(preload|prefetch)\1/ */
 const LINK_PRELOAD_OR_PREFETCH_REGEX = /\srel=('|")?(preload|prefetch)\1/;
+/** /.*\shref=('|")?([^>'"\s]+)/ */
 const LINK_HREF_REGEX = /.*\shref=('|")?([^>'"\s]+)/;
+/** /.*\sas=('|")?font\1.*\/ */
 const LINK_AS_FONT = /.*\sas=('|")?font\1.*/;
+/** /<style[^>]*>[\s\S]*?<\/style>/gi */
 const STYLE_TAG_REGEX = /<style[^>]*>[\s\S]*?<\/style>/gi;
+/** /\s+rel=('|")?stylesheet\1.*\/ */
 const STYLE_TYPE_REGEX = /\s+rel=('|")?stylesheet\1.*/;
+/** /.*\shref=('|")?([^>'"\s]+)/ */
 const STYLE_HREF_REGEX = /.*\shref=('|")?([^>'"\s]+)/;
+/** /\<!--([\s\S]*?)-->/g */
 const HTML_COMMENT_REGEX = /<!--([\s\S]*?)-->/g;
+/** /<link(\s+|\s+.+\s+)ignore(\s*|\s+.*|=.*)>/is */
 const LINK_IGNORE_REGEX = /<link(\s+|\s+.+\s+)ignore(\s*|\s+.*|=.*)>/is;
+/** /<style(\s+|\s+.+\s+)ignore(\s*|\s+.*|=.*)>/is */
 const STYLE_IGNORE_REGEX = /<style(\s+|\s+.+\s+)ignore(\s*|\s+.*|=.*)>/is;
+/** /<script(\s+|\s+.+\s+)ignore(\s*|\s+.*|=.*)>/is */
 const SCRIPT_IGNORE_REGEX = /<script(\s+|\s+.+\s+)ignore(\s*|\s+.*|=.*)>/is;
 
 function hasProtocol(url) {
@@ -46,9 +66,9 @@ export const genIgnoreAssetReplaceSymbol = url => `<!-- ignore asset ${url || 'f
 export const genModuleScriptReplaceSymbol = (scriptSrc, moduleSupport) => `<!-- ${moduleSupport ? 'nomodule' : 'module'} script ${scriptSrc} ignored by import-html-entry -->`;
 
 /**
- * parse the script link from the template
+ * parse the script link from the template 解析模板中的脚本链接
  * 1. collect stylesheets
- * 2. use global eval to evaluate the inline scripts
+ * 2. use global eval to evaluate the inline scripts 使用全局eval对内联脚本求值
  *    see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Function#Difference_between_Function_constructor_and_function_declaration
  *    see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/eval#Do_not_ever_use_eval!
  * @param tpl
@@ -68,12 +88,17 @@ export default function processTpl(tpl, baseURI, postProcessTemplate) {
 
 		/*
 		remove html comment first
+		先删除HTML注释
 		*/
 		.replace(HTML_COMMENT_REGEX, '')
 
+		/**
+		 * link css 处理
+		 */
 		.replace(LINK_TAG_REGEX, match => {
 			/*
 			change the css link
+			修改CSS链接
 			*/
 			const styleType = !!match.match(STYLE_TYPE_REGEX);
 			if (styleType) {
@@ -107,12 +132,18 @@ export default function processTpl(tpl, baseURI, postProcessTemplate) {
 
 			return match;
 		})
+		/**
+		 * style css 处理
+		 */
 		.replace(STYLE_TAG_REGEX, match => {
 			if (STYLE_IGNORE_REGEX.test(match)) {
 				return genIgnoreAssetReplaceSymbol('style file');
 			}
 			return match;
 		})
+		/**
+		 * script 处理
+		 */
 		.replace(ALL_SCRIPT_REGEX, (match, scriptTag) => {
 			const scriptIgnore = scriptTag.match(SCRIPT_IGNORE_REGEX);
 			const moduleScriptIgnore =

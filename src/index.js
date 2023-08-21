@@ -24,16 +24,21 @@ if (!window.fetch) {
 }
 const defaultFetch = window.fetch.bind(window);
 
+/**
+ * 默认是直接返回 tpl
+ * @param {*} tpl 
+ * @returns 
+ */
 function defaultGetTemplate(tpl) {
 	return tpl;
 }
 
 /**
  * convert external css link to inline style for performance optimization
- * @param template
- * @param styles
- * @param opts
- * @return embedHTML
+ * @param template 类似于这种的存在，主要是里面的html <!--  link styles replaced by import-html-entry -->html<!--   script scripts replaced by import-html-entry -->
+ * @param styles styles 数组
+ * @param opts fetch 默认是 window.fetch 请求
+ * @return {string} embedHTML 将 css 放在 html 前面 js放在 html 后面
  */
 function getEmbedHTML(template, styles, opts = {}) {
 	const { fetch = defaultFetch } = opts;
@@ -42,6 +47,7 @@ function getEmbedHTML(template, styles, opts = {}) {
 	return getExternalStyleSheets(styles, fetch)
 		.then(styleSheets => {
 			embedHTML = styles.reduce((html, styleSrc, i) => {
+				// 在这里将对应的 style 返回回来
 				html = html.replace(genLinkReplaceSymbol(styleSrc), isInlineCode(styleSrc) ? `${styleSrc}` : `<style>/* ${styleSrc} */${styleSheets[i]}</style>`);
 				return html;
 			}, embedHTML);
@@ -49,8 +55,16 @@ function getEmbedHTML(template, styles, opts = {}) {
 		});
 }
 
+/** 判断是否以 ‘<’ 字符串开头 */
 const isInlineCode = code => code.startsWith('<');
 
+/**
+ * 生成一个代码字符串，类似于模块化一样将方法包裹一层。
+ * @param {*} scriptSrc 
+ * @param {*} scriptText 
+ * @param {*} opts 
+ * @returns 
+ */
 function getExecutableScript(scriptSrc, scriptText, opts = {}) {
 	const { proxy, strictGlobal, scopedGlobalVariables = [] } = opts;
 
@@ -59,7 +73,7 @@ function getExecutableScript(scriptSrc, scriptText, opts = {}) {
 	// 将 scopedGlobalVariables 拼接成变量声明，用于缓存全局变量，避免每次使用时都走一遍代理
 	const scopedGlobalVariableDefinition = scopedGlobalVariables.length ? `const {${scopedGlobalVariables.join(',')}}=this;` : '';
 
-	// 通过这种方式获取全局 window，因为 script 也是在全局作用域下运行的，所以我们通过 window.proxy 绑定时也必须确保绑定到全局 window 上
+	// 通过这种方式获取全局 window ，因为 script 也是在全局作用域下运行的，所以我们通过 window.proxy 绑定时也必须确保绑定到全局 window 上
 	// 否则在嵌套场景下， window.proxy 设置的是内层应用的 window，而代码其实是在全局作用域运行的，会导致闭包里的 window.proxy 取的是最外层的微应用的 proxy
 	const globalWindow = (0, eval)('window');
 	globalWindow.proxy = proxy;
@@ -74,33 +88,51 @@ function getExecutableScript(scriptSrc, scriptText, opts = {}) {
 }
 
 // for prefetch
+/**
+ * 主要是将 styles 中的内容返回
+ * @param {Array<string>} styles styles数组
+ * @param {fetch} fetch 请求方法
+ * @returns {Array<Promise<string>>} styles text部分
+ */
 export function getExternalStyleSheets(styles, fetch = defaultFetch) {
 	return Promise.all(styles.map(styleLink => {
 			if (isInlineCode(styleLink)) {
 				// if it is inline style
+				// 如果是 <style>xxxx</style>
 				return getInlineCode(styleLink);
 			} else {
 				// external styles
+				// 判断是否存在于缓存，然后将 css 内容返回同时存储缓存
 				return styleCache[styleLink] ||
 					(styleCache[styleLink] = fetch(styleLink).then(response => response.text()));
 			}
-
 		},
 	));
 }
 
 // for prefetch
+/**
+ * 获取 scripts 信息 返回的是 text()
+ * @param {*} scripts 
+ * @param {*} fetch 
+ * @param {*} errorCallback 
+ * @returns 
+ */
 export function getExternalScripts(scripts, fetch = defaultFetch, errorCallback = () => {
 }) {
 
+	/**
+	 * 请求 script 数据
+	 * 使用了 requestIdleCallback api
+	 * @param {*} scriptUrl 
+	 * @param {*} opts 
+	 * @returns 
+	 */
 	const fetchScript = (scriptUrl, opts) => scriptCache[scriptUrl] ||
 		(scriptCache[scriptUrl] = fetch(scriptUrl, opts).then(response => {
 			// usually browser treats 4xx and 5xx response of script loading as an error and will fire a script error event
+			// 通常浏览器将加载脚本的4xx和5xx响应视为错误，并触发脚本错误事件
 			// https://stackoverflow.com/questions/5625420/what-http-headers-responses-trigger-the-onerror-handler-on-a-script-tag/5625603
-			if (response.status >= 400) {
-				throw new Error(`${scriptUrl} load failed with status ${response.status}`);
-			}
-
 			return response.text();
 		}).catch(e => {
 			errorCallback();
@@ -151,7 +183,8 @@ const supportsUserTiming =
 	typeof performance.clearMeasures === 'function';
 
 /**
- * FIXME to consistent with browser behavior, we should only provide callback way to invoke success and error event
+ * FIXME要与浏览器行为一致，我们应该只提供回调方式来调用成功和错误事件
+ * 类似于执行 script 方法
  * @param entry
  * @param scripts
  * @param proxy
@@ -170,6 +203,11 @@ export function execScripts(entry, scripts, proxy = window, opts = {}) {
 	return getExternalScripts(scripts, fetch, error)
 		.then(scriptsText => {
 
+			/**
+			 * 使用 eval 进行处理 执行
+			 * @param {*} scriptSrc 
+			 * @param {*} inlineScript 
+			 */
 			const geval = (scriptSrc, inlineScript) => {
 				const rawCode = beforeExec(inlineScript, scriptSrc) || inlineScript;
 				const code = getExecutableScript(scriptSrc, rawCode, { proxy, strictGlobal, scopedGlobalVariables });
@@ -179,6 +217,12 @@ export function execScripts(entry, scripts, proxy = window, opts = {}) {
 				afterExec(inlineScript, scriptSrc);
 			};
 
+			/**
+			 * 执行 geval 方法
+			 * @param {*} scriptSrc 
+			 * @param {*} inlineScript 
+			 * @param {*} resolve 
+			 */
 			function exec(scriptSrc, inlineScript, resolve) {
 
 				const markName = `Evaluating script ${scriptSrc}`;
@@ -300,13 +344,16 @@ export default function importHTML(url, opts = {}) {
 		}));
 }
 
+/**
+ * @param {string | { scripts?: string[]; styles?: string[]; html?: string }} entry 应用入口
+ * @param {*} opts 
+ * @returns 
+ */
 export function importEntry(entry, opts = {}) {
 	const { fetch = defaultFetch, getTemplate = defaultGetTemplate, postProcessTemplate } = opts;
 	const getPublicPath = opts.getPublicPath || opts.getDomain || defaultGetPublicPath;
 
-	if (!entry) {
-		throw new SyntaxError('entry should not be empty!');
-	}
+	// entry is must
 
 	// html entry
 	if (typeof entry === 'string') {
@@ -322,14 +369,21 @@ export function importEntry(entry, opts = {}) {
 	if (Array.isArray(entry.scripts) || Array.isArray(entry.styles)) {
 
 		const { scripts = [], styles = [], html = '' } = entry;
+		// 这两个方法是生成这样的注释 <!--  link styles replaced by import-html-entry -->html<!--   script scripts replaced by import-html-entry -->
+		// 看了后续的方法，然后后面是将注释又换回真正的值
 		const getHTMLWithStylePlaceholder = tpl => styles.reduceRight((html, styleSrc) => `${genLinkReplaceSymbol(styleSrc)}${html}`, tpl);
 		const getHTMLWithScriptPlaceholder = tpl => scripts.reduce((html, scriptSrc) => `${html}${genScriptReplaceSymbol(scriptSrc)}`, tpl);
 
 		return getEmbedHTML(getTemplate(getHTMLWithScriptPlaceholder(getHTMLWithStylePlaceholder(html))), styles, { fetch }).then(embedHTML => ({
+			/** style html scrip 整合文字 */
 			template: embedHTML,
+			/** public path */
 			assetPublicPath: getPublicPath(entry),
+			/** get script 方法 */
 			getExternalScripts: () => getExternalScripts(scripts, fetch),
+			/** get style 方法 */
 			getExternalStyleSheets: () => getExternalStyleSheets(styles, fetch),
+			/** 执行 script 感觉有点沙箱的效果 */
 			execScripts: (proxy, strictGlobal, opts = {}) => {
 				if (!scripts.length) {
 					return Promise.resolve();
