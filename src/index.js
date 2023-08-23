@@ -366,6 +366,7 @@ export function importEntry(entry, opts = {}) {
 	}
 
 	// config entry
+	// 如果是 config entry ，那么生成的 style 和 script 的顺序是 styles html scripts
 	if (Array.isArray(entry.scripts) || Array.isArray(entry.styles)) {
 
 		const { scripts = [], styles = [], html = '' } = entry;

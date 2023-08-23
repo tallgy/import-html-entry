@@ -130,7 +130,7 @@ export const requestIdleCallback =
 	};
 
 /**
- * 读取响应的文字
+ * 读取响应的html文字
  * @param {*} response 
  * @param {*} autoDetectCharset 
  * @returns 
